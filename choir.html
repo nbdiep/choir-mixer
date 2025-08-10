@@ -3,25 +3,63 @@
 <head>
   <title>Choir Mixer</title>
   <style>
-    body { font-family: Arial; margin: 20px; }
-    .track { margin: 10px 0; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f9f9f9;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .track {
+      background: #fff;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .controls {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+    button {
+      padding: 8px 14px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      background: #4CAF50;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #45a049;
+    }
   </style>
 </head>
 <body>
   <h1>Choir Mixer</h1>
 
   <div id="tracks"></div>
-  <button onclick="playAll()">Play</button>
-  <button onclick="stopAll()">Stop</button>
+  <div style="text-align:center;">
+    <button onclick="startAudio()">▶ Play</button>
+    <button onclick="stopAll()">⏹ Stop</button>
+  </div>
 
   <script>
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let audioCtx;
     const tracks = [
-      { name: "Soprano1", file: "soprano1.mp3" },
-      { name: "Soprano2", file: "soprano2.mp3" },
+      { name: "Soprano 1", file: "soprano1.mp3" },
+      { name: "Soprano 2", file: "soprano2.mp3" },
       { name: "Alto", file: "alto.mp3" },
-      { name: "Tenor1", file: "tenor1.mp3" },
-      { name: "Tenor2", file: "tenor2.mp3" },
+      { name: "Tenor 1", file: "tenor1.mp3" },
+      { name: "Tenor 2", file: "tenor2.mp3" },
       { name: "Bass", file: "bass.mp3" },
       { name: "Instrumental", file: "instrumental.mp3" }
     ];
@@ -29,46 +67,60 @@
     let sources = [];
     let buffers = [];
     let gains = [];
+    let playing = false;
 
-    // Create UI
     const container = document.getElementById("tracks");
     tracks.forEach((t, i) => {
       const div = document.createElement("div");
       div.className = "track";
       div.innerHTML = `
-        <label>
-          <input type="checkbox" checked onchange="toggleTrack(${i}, this.checked)"> ${t.name}
-        </label>
-        <input type="range" min="0" max="1" step="0.01" value="1" oninput="changeVolume(${i}, this.value)">
+        <div>${t.name}</div>
+        <div class="controls">
+          <input type="checkbox" checked onchange="toggleTrack(${i}, this.checked)">
+          <input type="range" min="0" max="1" step="0.01" value="1" oninput="changeVolume(${i}, this.value)">
+        </div>
       `;
       container.appendChild(div);
     });
 
-    // Load audio files
-    tracks.forEach((t, i) => {
-      fetch(t.file)
-        .then(r => r.arrayBuffer())
-        .then(d => audioCtx.decodeAudioData(d))
-        .then(buffer => { buffers[i] = buffer; });
-    });
+    async function loadAudio() {
+      for (let i = 0; i < tracks.length; i++) {
+        const response = await fetch(tracks[i].file);
+        const arrayBuffer = await response.arrayBuffer();
+        buffers[i] = await audioCtx.decodeAudioData(arrayBuffer);
+      }
+    }
+
+    async function startAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        await loadAudio();
+      }
+      playAll();
+    }
 
     function playAll() {
       stopAll();
+      playing = true;
       sources = [];
       buffers.forEach((buffer, i) => {
         if (!buffer) return;
         const source = audioCtx.createBufferSource();
         const gainNode = audioCtx.createGain();
         source.buffer = buffer;
+        source.loop = true;
         source.connect(gainNode).connect(audioCtx.destination);
         sources[i] = source;
         gains[i] = gainNode;
+        gainNode.gain.value = 1;
         source.start(0);
       });
     }
 
     function stopAll() {
+      playing = false;
       sources.forEach(s => { if (s) s.stop(); });
+      sources = [];
     }
 
     function changeVolume(i, value) {
