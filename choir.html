@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Choir Mixer</title>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    .track { margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>Choir Mixer</h1>
+
+  <div id="tracks"></div>
+  <button onclick="playAll()">Play</button>
+  <button onclick="stopAll()">Stop</button>
+
+  <script>
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const tracks = [
+      { name: "Soprano1", file: "soprano1.mp3" },
+      { name: "Soprano2", file: "soprano2.mp3" },
+      { name: "Alto", file: "alto.mp3" },
+      { name: "Tenor1", file: "tenor1.mp3" },
+      { name: "Tenor2", file: "tenor2.mp3" },
+      { name: "Bass", file: "bass.mp3" },
+      { name: "Instrumental", file: "instrumental.mp3" }
+    ];
+
+    let sources = [];
+    let buffers = [];
+    let gains = [];
+
+    // Create UI
+    const container = document.getElementById("tracks");
+    tracks.forEach((t, i) => {
+      const div = document.createElement("div");
+      div.className = "track";
+      div.innerHTML = `
+        <label>
+          <input type="checkbox" checked onchange="toggleTrack(${i}, this.checked)"> ${t.name}
+        </label>
+        <input type="range" min="0" max="1" step="0.01" value="1" oninput="changeVolume(${i}, this.value)">
+      `;
+      container.appendChild(div);
+    });
+
+    // Load audio files
+    tracks.forEach((t, i) => {
+      fetch(t.file)
+        .then(r => r.arrayBuffer())
+        .then(d => audioCtx.decodeAudioData(d))
+        .then(buffer => { buffers[i] = buffer; });
+    });
+
+    function playAll() {
+      stopAll();
+      sources = [];
+      buffers.forEach((buffer, i) => {
+        if (!buffer) return;
+        const source = audioCtx.createBufferSource();
+        const gainNode = audioCtx.createGain();
+        source.buffer = buffer;
+        source.connect(gainNode).connect(audioCtx.destination);
+        sources[i] = source;
+        gains[i] = gainNode;
+        source.start(0);
+      });
+    }
+
+    function stopAll() {
+      sources.forEach(s => { if (s) s.stop(); });
+    }
+
+    function changeVolume(i, value) {
+      if (gains[i]) gains[i].gain.value = value;
+    }
+
+    function toggleTrack(i, enabled) {
+      if (gains[i]) gains[i].gain.value = enabled ? 1 : 0;
+    }
+  </script>
+</body>
+</html>
+
